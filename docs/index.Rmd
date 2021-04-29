@@ -9,19 +9,21 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-```
-
-# Netflix
-
-```{r setup}
 library(tidyverse)
 library(lubridate)
 library(scales)
+library(easystats)
 
 theme_set(theme_light())
-
 ```
 
+# Netflix data analysis
+
+We will analyze Netflix movies and TV shows, and do:
+
+-   plots
+-   tables
+-   analysis
 
 ```{r}
 nx_raw <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-20/netflix_titles.csv')
@@ -31,7 +33,6 @@ nx <-
     mutate(date_added = mdy(date_added))
 
 ```
-
 
 ```{r}
 
@@ -57,6 +58,73 @@ nx %>%
     scale_fill_viridis_c() +
     facet_wrap(~type) +
     labs(title = "Movie rating frequency across years")
+
+```
+
+
+```{r}
+nx %>% 
+    separate_rows(country, sep = ",") %>% 
+    mutate(country = str_squish(country)) %>% 
+    count(country, sort = TRUE) %>% 
+    drop_na(country) %>% 
+    top_n(20) %>% 
+    mutate(country = fct_reorder(country, n)) %>% 
+    ggplot() +
+    aes(y = country, x = n, fill = country) +
+    geom_col(show.legend = FALSE) +
+    labs(title = "Number of movies by country", 
+         x = NULL, y = NULL)
+
+```
+
+```{r}
+
+nx %>% 
+    separate_rows(listed_in, sep = ", ") %>% 
+    count(rating, listed_in) %>% 
+    mutate(listed_in = fct_reorder(listed_in, n, sum)) %>% 
+    ggplot() +
+    aes(x = rating, y = listed_in, fill = n) +
+    geom_tile() +
+    scale_fill_viridis_c() +
+    labs(title = "Moving listing and rating",
+         x = NULL, y = NULL)
+    
+```
+
+# Hypothesis testing
+
+We check if there is an association between the duration of the movie and the release date in the Netflix repertoire.
+
+```{r}
+
+movies <- 
+    nx %>% 
+    filter(type == "Movie", release_year >= 1980
+           ) %>% 
+    select(show_id, release_year, duration, title) %>% 
+    mutate(duration = parse_number(duration))
+    
+dur_mod <- lm(duration ~ release_year, data = movies)
+
+summary(dur_mod)
+
+check_model(dur_mod)
+
+```
+
+Movies that were made earlier are longer (at least from 1980).
+
+```{r}
+
+movies %>% 
+    ggplot() +
+    aes(x = release_year, y = duration, group = release_year) +
+    geom_text(aes(label = title), check_overlap = TRUE) +
+    geom_point() +
+    geom_smooth() +
+    NULL
 
 ```
 
